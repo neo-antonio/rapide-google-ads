@@ -6,8 +6,9 @@
 <title>Rapide Meta Ads Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script>try{var __s=JSON.parse(localStorage.getItem("rapide_dashboard_settings")||"{}");document.documentElement.setAttribute("data-theme",__s.dark?"dark":"light")}catch(e){}</script>
 </head>
 <body>
 
@@ -35,10 +36,14 @@
 <!-- Dashboard -->
 <div id="app" hidden>
   <header class="top">
+  <div class="top-inner">
     <div class="top-row">
       <h1>Rapide Meta Ads Dashboard</h1>
       <div class="top-actions">
         <span id="updated" class="muted"></span>
+        <button type="button" id="settingsBtn" class="ghost icon" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
         <button type="button" id="refresh" class="ghost">Refresh</button>
         <button type="button" id="signout" class="ghost">Sign out</button>
       </div>
@@ -87,6 +92,7 @@
       </div>
     </div>
     <p id="rangeNote" class="range-note"></p>
+  </div>
   </header>
 
   <main>
@@ -116,7 +122,28 @@
   </main>
 </div>
 
+<!-- Settings popup -->
+<div id="settingsModal" class="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="stTitle">
+    <div class="sheet-head">
+      <h2 id="stTitle">Settings</h2>
+      <button type="button" id="stClose" class="ghost icon" aria-label="Close settings">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <label class="setting" for="setPoints">
+      <span class="setting-text"><b>Points on line charts</b><small>Show a dot on every data point. Off by default.</small></span>
+      <span class="switch"><input type="checkbox" id="setPoints"><span class="track"></span></span>
+    </label>
+    <label class="setting" for="setDark">
+      <span class="setting-text"><b>Dark mode</b><small>Switch the whole dashboard to the dark theme. Light by default.</small></span>
+      <span class="switch"><input type="checkbox" id="setDark"><span class="track"></span></span>
+    </label>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="enhance.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

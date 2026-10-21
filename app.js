@@ -11,6 +11,8 @@
   };
 
   var TOKEN_KEY = 'rapide_dashboard_token';
+  var SETTINGS_KEY = 'rapide_dashboard_settings';
+  var REDUCE_MOTION = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   var COLORS = { orange: '#f29900', blue: '#3b82f6', vermilion: '#e8501b', gray: '#8a8f99' };
 
   /* ======================================================================
@@ -27,6 +29,24 @@
     return String(s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+  function loadSettings() {
+    try {
+      var o = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      return { points: !!o.points, dark: !!o.dark };
+    } catch (e) { return { points: false, dark: false }; }
+  }
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch (e) { /* storage unavailable */ }
+  }
+  function applyTheme() {
+    document.documentElement.setAttribute('data-theme', state.settings.dark ? 'dark' : 'light');
+  }
+  /** Colors Chart.js needs in JS (CSS variables can't reach the canvas) */
+  function theme() {
+    return state.settings.dark
+      ? { tick: '#8f8c83', label: '#f3f2ec', grid: '#2a292d', axis: '#2a292d', tipBg: '#232325', tipTitle: '#f3f2ec', tipBody: '#bdbab1', tipBorder: '#3e3d3c', pt: '#161617' }
+      : { tick: '#737373', label: '#171717', grid: '#eeeeee', axis: '#d4d4d4', tipBg: '#171717', tipTitle: '#ffffff', tipBody: '#e5e5e5', tipBorder: 'rgba(0,0,0,0)', pt: '#ffffff' };
   }
   function store(op, val) {
     try {
@@ -84,6 +104,7 @@
     checkout:     { label: 'Checkout',      fmt: 'int',   pol: 1 },
     bookings:     { label: 'Bookings',      fmt: 'int',   pol: 1 },
     cpb:          { label: 'Cost per Booking', fmt: 'money', pol: -1 },
+    totalBookings: { label: 'Total Bookings', fmt: 'int', pol: 1 },
     freeBookings: { label: 'Free Bookings', fmt: 'int',   pol: 1 },
     r1:  { label: 'Page View to Estimate',     fmt: 'pct', pol: 1 },
     r2:  { label: 'Estimate to Cart',   fmt: 'pct', pol: 1 },
@@ -115,6 +136,7 @@
     d.ctr = div(t.clicks, t.impressions);
     d.cpc = div(t.cost, t.clicks);
     d.cpb = div(t.cost, t.bookings);
+    d.totalBookings = t.bookings + t.freeBookings;
     d.roas = div(t.convValue, t.cost);
     d.r1 = div(t.getEstimate, t.pageViews);
     d.r2 = div(t.addToCart, t.getEstimate);
@@ -186,6 +208,8 @@
     cmpMode: 'off',
     cmpCustom: null,
     chartView: {},
+    chartSel: {},
+    settings: loadSettings(),
     bdBy: 'campaign',
     bdMetric: 'cost',
     bdSort: { key: 'cost', dir: -1 },
@@ -542,6 +566,7 @@
   function renderCards() {
     var cur = derive(sumRange(ctx.map, ctx.range.s, ctx.range.e));
     var prev = ctx.cmp ? derive(sumRange(ctx.map, ctx.cmp.s, ctx.cmp.e)) : null;
+    $('#cards').classList.toggle('cmp', !!prev);
 
     CARD_ORDER.forEach(function (k) {
       var m = M[k], card = $('#card-' + k);
@@ -564,20 +589,33 @@
     });
   }
 
-  /* ---------- Chart cards ---------- */
+  /* ---------- Chart cards ----------
+     pick 'multi': chips toggle metrics (max 2, first picked = left axis, second = right axis)
+     pick 'mode' : chips choose one view
+     def = what the chart shows until you change it                                  */
   var CHARTS = [
-    { id: 'ctr', title: 'CTR', series: [{ key: 'ctr', type: 'line', color: COLORS.orange, axis: 'y', fill: true }] },
-    { id: 'imp', title: 'Impressions and CPM', series: [
-      { key: 'impressions', type: 'line', color: COLORS.orange, axis: 'y' },
-      { key: 'cpm', type: 'bar', color: COLORS.blue, axis: 'y1' }] },
-    { id: 'clk', title: 'Clicks and Cost/Click', series: [
-      { key: 'clicks', type: 'line', color: COLORS.orange, axis: 'y' },
-      { key: 'cpc', type: 'bar', color: COLORS.blue, axis: 'y1' }] },
-    { id: 'cpb', title: 'Cost per Booking', series: [{ key: 'cpb', type: 'line', color: COLORS.vermilion, axis: 'y', fill: true }] },
-    { id: 'bks', title: 'Bookings and Spend', series: [
-      { key: 'bookings', type: 'bar', color: COLORS.blue, axis: 'y1' },
-      { key: 'cost', type: 'line', color: COLORS.vermilion, axis: 'y' }] },
-    { id: 'roas', title: 'ROAS', series: [{ key: 'roas', type: 'line', color: COLORS.vermilion, axis: 'y', fill: true }] }
+    { id: 'spend', title: 'Spending', pick: 'multi', max: 2, def: ['cost'], metrics: [
+      { key: 'cost',     label: 'Spend',            type: 'line', color: COLORS.vermilion },
+      { key: 'bookings', label: 'Bookings',         type: 'bar',  color: COLORS.blue },
+      { key: 'cpb',      label: 'Cost per booking', type: 'line', color: COLORS.orange }] },
+    { id: 'bks', title: 'Bookings', pick: 'mode', def: 'total', modes: [
+      { id: 'total', label: 'Total', series: [
+        { key: 'totalBookings', label: 'Total bookings', type: 'bar', color: COLORS.blue }] },
+      { id: 'paid', label: 'Paid', series: [
+        { key: 'bookings', label: 'Paid bookings', type: 'bar', color: COLORS.blue }] },
+      { id: 'stack', label: 'Paid + Free', stacked: true, series: [
+        { key: 'bookings',     label: 'Paid bookings', type: 'bar', color: COLORS.blue },
+        { key: 'freeBookings', label: 'Free bookings', type: 'bar', color: COLORS.orange }] }] },
+    { id: 'traffic', title: 'Traffic Performance', pick: 'multi', max: 2, def: ['impressions'], metrics: [
+      { key: 'impressions', label: 'Impressions', type: 'line', color: COLORS.orange },
+      { key: 'cpm',         label: 'CPM',         type: 'bar',  color: COLORS.blue }] },
+    { id: 'click', title: 'Click Performance', pick: 'multi', max: 2, def: ['clicks'], metrics: [
+      { key: 'clicks', label: 'Click volume', type: 'line', color: COLORS.orange },
+      { key: 'ctr',    label: 'CTR',          type: 'line', color: COLORS.vermilion },
+      { key: 'cpc',    label: 'Cost/click',   type: 'bar',  color: COLORS.blue }] },
+    { id: 'profit', title: 'Profitability', pick: 'multi', max: 2, def: ['convValue'], metrics: [
+      { key: 'convValue', label: 'Conversion value', type: 'line', color: COLORS.orange },
+      { key: 'roas',      label: 'ROAS',             type: 'bar',  color: COLORS.blue }] }
   ];
   var VIEWS = [['day', 'Daily'], ['week', 'Weekly'], ['month', 'Monthly'], ['all', 'All time']];
 
@@ -586,10 +624,52 @@
     wrap.innerHTML = '';
     CHARTS.forEach(function (def) {
       state.chartView[def.id] = 'day';
+      state.chartSel[def.id] = def.pick === 'mode' ? def.def : def.def.slice();
+
       var card = el('div', 'chart-card');
       card.id = 'cc-' + def.id;
       var head = el('div', 'chart-head');
       head.appendChild(el('h3', null, esc(def.title)));
+
+      // metric / mode chips
+      var chips = el('div', 'chips');
+      chips.setAttribute('role', 'group');
+      chips.setAttribute('aria-label', def.title + (def.pick === 'mode' ? ' view' : ' metrics'));
+      if (def.pick === 'multi') chips.title = 'Pick up to ' + def.max + ' metrics';
+      var items = def.pick === 'mode'
+        ? def.modes.map(function (m) { return { k: m.id, l: m.label }; })
+        : def.metrics.map(function (m) { return { k: m.key, l: m.label }; });
+      items.forEach(function (it) {
+        var b = el('button', 'chip', esc(it.l));
+        b.type = 'button';
+        b.dataset.k = it.k;
+        chips.appendChild(b);
+      });
+      function syncChips() {
+        var sel = state.chartSel[def.id];
+        Array.prototype.forEach.call(chips.children, function (b) {
+          var on = def.pick === 'mode' ? sel === b.dataset.k : sel.indexOf(b.dataset.k) >= 0;
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+      }
+      chips.addEventListener('click', function (e) {
+        var b = e.target.closest('button');
+        if (!b) return;
+        var k = b.dataset.k;
+        if (def.pick === 'mode') {
+          state.chartSel[def.id] = k;
+        } else {
+          var sel = state.chartSel[def.id], i = sel.indexOf(k);
+          if (i >= 0) { if (sel.length > 1) sel.splice(i, 1); }   // always keep one
+          else { sel.push(k); if (sel.length > def.max) sel.shift(); }  // 3rd pick replaces the oldest
+        }
+        syncChips();
+        drawChart(def);
+      });
+      syncChips();
+      head.appendChild(chips);
+
+      // time view
       var seg = el('div', 'seg');
       seg.setAttribute('role', 'group');
       seg.setAttribute('aria-label', def.title + ' time view');
@@ -617,6 +697,17 @@
       card.appendChild(body);
       wrap.appendChild(card);
     });
+
+    // 6th slot: custom chart builder (not built yet)
+    var soon = el('div', 'chart-card soon');
+    soon.id = 'cc-custom';
+    soon.innerHTML =
+      '<button type="button" class="plus" disabled aria-disabled="true" aria-label="Create a custom chart (coming soon)">' +
+      '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>' +
+      '<h3>Custom chart</h3>' +
+      '<p>Build your own bar, stacked bar, line or bar + line chart from any metric.</p>' +
+      '<span class="badge">Coming soon</span>';
+    wrap.appendChild(soon);
   }
 
   function renderCharts() { CHARTS.forEach(drawChart); }
@@ -657,10 +748,46 @@
     };
   }
 
+  /** Stacked bars: only the topmost non-empty segment gets rounded top corners */
+  function stackRadius(r) {
+    return function (c) {
+      var ch = c.chart, i = c.dataIndex, me = c.dataset, top = true;
+      ch.data.datasets.forEach(function (d, j) {
+        if (d !== me && d.stack === me.stack && d.order > me.order && ch.isDatasetVisible(j) && Number(d.data[i]) > 0) top = false;
+      });
+      return top ? { topLeft: r, topRight: r, bottomLeft: 0, bottomRight: 0 }
+                 : { topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0 };
+    };
+  }
+
+  function gradient(color, top, bottom) {
+    return function (c) {
+      var ch = c.chart, area = ch.chartArea;
+      if (!area) return rgba(color, top);
+      var g = ch.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+      g.addColorStop(0, rgba(color, top));
+      g.addColorStop(1, rgba(color, bottom));
+      return g;
+    };
+  }
+
+  /** The series currently on show for a chart, with axes assigned */
+  function activeSeries(def) {
+    function withAxis(s, axis) { var o = {}; for (var k in s) o[k] = s[k]; o.axis = axis; return o; }
+    if (def.pick === 'mode') {
+      var mode = def.modes.filter(function (m) { return m.id === state.chartSel[def.id]; })[0] || def.modes[0];
+      return { stacked: !!mode.stacked, series: mode.series.map(function (s) { return withAxis(s, 'y'); }) };
+    }
+    var sel = state.chartSel[def.id];
+    var list = def.metrics.filter(function (m) { return sel.indexOf(m.key) >= 0; });
+    return { stacked: false, series: list.map(function (s, i) { return withAxis(s, i === 0 ? 'y' : 'y1'); }) };
+  }
+
   function drawChart(def) {
     var card = $('#cc-' + def.id), canvas = $('canvas', card), body = $('.chart-body', card);
     var legend = $('.legend', card);
     var view = state.chartView[def.id];
+    var th = theme();
 
     if (state.charts[def.id]) { state.charts[def.id].destroy(); state.charts[def.id] = null; }
     var oldMsg = $('.empty', body); if (oldMsg) oldMsg.remove();
@@ -669,6 +796,8 @@
       body.appendChild(el('div', 'empty', 'Charts could not load. Check your connection and refresh the page.'));
       return;
     }
+
+    var act = activeSeries(def), series = act.series, stacked = act.stacked, solo = series.length === 1;
 
     var range = view === 'all' ? { s: state.dataMin, e: state.dataMax } : ctx.range;
     var cmp = view === 'all' ? null : ctx.cmp;
@@ -684,40 +813,51 @@
 
     // legend
     var lg = '';
-    def.series.forEach(function (s) {
-      lg += '<span><i class="' + (s.type === 'bar' ? 'bar' : '') + '" style="background:' + s.color + '"></i>' + esc(M[s.key].label) + '</span>';
+    series.forEach(function (s) {
+      lg += '<span><i class="' + (s.type === 'bar' ? 'bar' : '') + '" style="background:' + s.color + '"></i>' + esc(s.label) + '</span>';
     });
     if (cmp) lg += '<span><i class="ghost" style="background:' + COLORS.gray + '"></i>Comparison period</span>';
     else if (view === 'all') lg += '<span>All data, date range ignored</span>';
     legend.innerHTML = lg;
 
     var n = cur.length;
-    var showPts = n <= 31;
+    var pts = !!state.settings.points;
     var datasets = [];
 
-    def.series.forEach(function (s, i) {
+    series.forEach(function (s, i) {
       var m = M[s.key];
       var curVals = curD.map(function (d) { return d[s.key]; });
       var isBar = s.type === 'bar';
 
       var ds = {
         type: s.type,
-        label: m.label,
+        label: s.label,
         data: curVals,
         yAxisID: s.axis,
         order: isBar ? 2 + i : i,
         borderColor: s.color,
-        backgroundColor: isBar ? rgba(s.color, 0.9) : (s.fill ? rgba(s.color, 0.1) : s.color),
-        borderWidth: isBar ? 0 : 2,
-        pointRadius: showPts ? 2 : 0,
-        pointHoverRadius: 4,
-        pointBackgroundColor: s.color,
-        tension: 0.15,
+        backgroundColor: isBar ? rgba(s.color, 0.9) : (solo ? gradient(s.color, 0.28, 0) : s.color),
+        borderWidth: isBar ? 0 : 2.5,
+        borderCapStyle: 'round',
+        borderJoinStyle: 'round',
+        pointRadius: pts ? 3 : 0,
+        pointHoverRadius: 5,
+        pointHitRadius: 12,
+        pointBackgroundColor: th.pt,
+        pointBorderColor: s.color,
+        pointBorderWidth: 2,
+        tension: 0.4,
+        cubicInterpolationMode: 'monotone',
         spanGaps: false,
-        fill: !isBar && s.fill ? 'origin' : false,
+        fill: !isBar && solo ? 'origin' : false,
         _fmt: m.fmt
       };
-      if (isBar) { ds.grouped = false; ds.barPercentage = 0.55; ds.categoryPercentage = 0.9; ds.maxBarThickness = 28; }
+      if (isBar) {
+        ds.borderRadius = stacked ? stackRadius(4) : 5;
+        ds.borderSkipped = false;
+        if (stacked) { ds.stack = 'cur'; ds.barPercentage = 0.7; ds.categoryPercentage = 0.9; ds.maxBarThickness = 26; }
+        else { ds.grouped = false; ds.barPercentage = 0.55; ds.categoryPercentage = 0.9; ds.maxBarThickness = 28; }
+      }
       datasets.push(ds);
 
       if (prevD) {
@@ -725,58 +865,68 @@
         for (var k = 0; k < n; k++) pv.push(prevD[k] ? prevD[k][s.key] : null);
         var g = {
           type: s.type,
-          label: m.label + ' (comparison)',
+          label: s.label + ' (comparison)',
           data: pv,
           yAxisID: s.axis,
           order: 10 + (isBar ? 2 + i : i),
-          borderColor: rgba(s.color, 0.4),
-          backgroundColor: isBar ? rgba(s.color, 0.22) : rgba(s.color, 0.14),
-          borderWidth: isBar ? 0 : 1.5,
+          borderColor: rgba(s.color, 0.45),
+          backgroundColor: rgba(s.color, 0.22),
+          borderWidth: isBar ? 0 : 1.75,
+          borderDash: isBar ? [] : [5, 4],
           pointRadius: 0,
           pointHoverRadius: 3,
-          tension: 0.15,
+          tension: 0.4,
+          cubicInterpolationMode: 'monotone',
           spanGaps: false,
-          fill: !isBar ? 'origin' : false,
+          fill: false,
           _fmt: m.fmt,
           _ghost: true
         };
-        if (isBar) { g.grouped = false; g.barPercentage = 0.95; g.categoryPercentage = 0.9; g.maxBarThickness = 40; }
+        if (isBar) {
+          g.borderRadius = stacked ? stackRadius(4) : 5;
+          g.borderSkipped = false;
+          if (stacked) { g.stack = 'prev'; g.barPercentage = 0.7; g.categoryPercentage = 0.9; g.maxBarThickness = 26; }
+          else { g.grouped = false; g.barPercentage = 0.95; g.categoryPercentage = 0.9; g.maxBarThickness = 40; }
+        }
         datasets.push(g);
       }
     });
 
     var axes = {};
-    def.series.forEach(function (s) { if (!axes[s.axis]) axes[s.axis] = M[s.key].fmt; });
+    series.forEach(function (s) { if (!axes[s.axis]) axes[s.axis] = M[s.key].fmt; });
 
     var scales = {
       x: {
+        stacked: stacked,
         grid: { display: false },
-        ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7, color: '#5d6471', font: { size: 11 } },
-        border: { color: '#cfd1d6' }
+        ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7, color: th.tick, font: { size: 11 } },
+        border: { color: th.axis }
       }
     };
     Object.keys(axes).forEach(function (a) {
       scales[a] = {
+        stacked: stacked,
         position: a === 'y1' ? 'right' : 'left',
         beginAtZero: true,
-        grid: { color: '#d9dade', drawOnChartArea: Object.keys(axes).length === 1 || a === 'y' },
+        grid: { color: th.grid, drawOnChartArea: Object.keys(axes).length === 1 || a === 'y' },
         border: { display: false },
-        ticks: { callback: tickFmt(axes[a]), color: '#5d6471', font: { size: 11 }, maxTicksLimit: 5 }
+        ticks: { callback: tickFmt(axes[a]), color: th.tick, font: { size: 11 }, maxTicksLimit: 5 }
       };
     });
-    // Two axes: a single-axis chart with only bars still draws gridlines on the left
-    if (axes.y1 && !axes.y) { scales.y1.position = 'left'; scales.y1.grid.drawOnChartArea = true; }
 
     state.charts[def.id] = new Chart(canvas, {
       data: { labels: cur.map(function (b) { return b.short; }), datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: false,
+        animation: REDUCE_MOTION ? false : { duration: 900, easing: 'easeOutQuart' },
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
           tooltip: {
+            backgroundColor: th.tipBg, titleColor: th.tipTitle, bodyColor: th.tipBody,
+            borderColor: th.tipBorder, borderWidth: 1,
+            padding: 12, cornerRadius: 10, boxPadding: 5, usePointStyle: true,
             callbacks: {
               title: function (items) { return items.length ? cur[items[0].dataIndex].long : ''; },
               afterTitle: function (items) {
@@ -901,6 +1051,7 @@
     var old = $('.empty', wrap); if (old) old.remove();
     if (typeof Chart === 'undefined') return;
 
+    var th = theme();
     var k = state.bdMetric, m = M[k];
     var cmpOn = !!ctx.cmp;
     var h = Math.max(160, list.length * (cmpOn ? 62 : 40) + 44);
@@ -911,13 +1062,13 @@
     var ds = [{
       label: 'Selected period',
       data: list.map(function (x) { return x.cur[k]; }),
-      backgroundColor: rgba(COLORS.blue, 0.9),
+      backgroundColor: rgba(COLORS.blue, 0.9), borderRadius: 5, borderSkipped: false,
       barPercentage: 0.8, categoryPercentage: 0.8, maxBarThickness: 22
     }];
     if (cmpOn) ds.push({
       label: 'Comparison period',
       data: list.map(function (x) { return x.prev[k]; }),
-      backgroundColor: rgba(COLORS.gray, 0.45),
+      backgroundColor: rgba(COLORS.gray, 0.45), borderRadius: 5, borderSkipped: false,
       barPercentage: 0.8, categoryPercentage: 0.8, maxBarThickness: 22
     });
 
@@ -928,15 +1079,19 @@
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        animation: false,
+        animation: REDUCE_MOTION ? false : { duration: 800, easing: 'easeOutQuart' },
         plugins: {
-          legend: { display: cmpOn, position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, color: '#5d6471', font: { size: 12 } } },
-          tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + fmtVal(m.fmt, c.parsed.x); } } }
+          legend: { display: cmpOn, position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, color: th.tick, font: { size: 12 } } },
+          tooltip: {
+            backgroundColor: th.tipBg, titleColor: th.tipTitle, bodyColor: th.tipBody,
+            borderColor: th.tipBorder, borderWidth: 1, padding: 12, cornerRadius: 10,
+            callbacks: { label: function (c) { return c.dataset.label + ': ' + fmtVal(m.fmt, c.parsed.x); } }
+          }
         },
         scales: {
-          x: { beginAtZero: true, grid: { color: '#d9dade' }, border: { display: false },
-               ticks: { callback: tickFmt(m.fmt), color: '#5d6471', font: { size: 11 }, maxTicksLimit: 6 } },
-          y: { grid: { display: false }, ticks: { color: '#1d2129', font: { size: 12 } } }
+          x: { beginAtZero: true, grid: { color: th.grid }, border: { display: false },
+               ticks: { callback: tickFmt(m.fmt), color: th.tick, font: { size: 11 }, maxTicksLimit: 6 } },
+          y: { grid: { display: false }, ticks: { color: th.label, font: { size: 12 } } }
         }
       }
     });
@@ -945,7 +1100,43 @@
   /* ======================================================================
      Boot
      ====================================================================== */
+  function initSettings() {
+    var modal = $('#settingsModal'), opener = $('#settingsBtn');
+    var pts = $('#setPoints'), dark = $('#setDark');
+    pts.checked = state.settings.points;
+    dark.checked = state.settings.dark;
+
+    function open() {
+      modal.hidden = false;
+      opener.setAttribute('aria-expanded', 'true');
+      $('#stClose').focus();
+    }
+    function close() {
+      modal.hidden = true;
+      opener.setAttribute('aria-expanded', 'false');
+      opener.focus();
+    }
+    opener.addEventListener('click', open);
+    $('#stClose').addEventListener('click', close);
+    modal.addEventListener('mousedown', function (e) { if (e.target === modal) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) close(); });
+
+    pts.addEventListener('change', function () {
+      state.settings.points = pts.checked;
+      saveSettings();
+      if (ctx) renderCharts();
+    });
+    dark.addEventListener('change', function () {
+      state.settings.dark = dark.checked;
+      saveSettings();
+      applyTheme();
+      if (ctx) { renderCharts(); renderBreakdown(); }
+    });
+  }
+
   function boot() {
+    applyTheme();
+    initSettings();
     $('#loginForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var t = $('#token').value.trim();
