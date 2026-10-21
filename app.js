@@ -323,6 +323,7 @@
       return o;
     }).filter(function (r) { return isFinite(r.day); });
     state.rows = rows;
+    state.debug = json.debug || '';
     if (rows.length) {
       state.dataMin = Math.min.apply(null, rows.map(function (r) { return r.day; }));
       state.dataMax = Math.max.apply(null, rows.map(function (r) { return r.day; }));
@@ -492,7 +493,7 @@
     if (!state.rows.length) {
       var bn = $('#banner');
       bn.className = 'banner';
-      bn.textContent = 'The Daily tab has no rows yet.';
+      bn.textContent = 'The Daily tab returned no rows. ' + (state.debug || '');
       bn.hidden = false;
     }
     var rows = filteredRows();
