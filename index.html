@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rapide Meta Ads Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Sign in -->
+<section id="login" class="login">
+  <form id="loginForm" class="login-card" novalidate>
+    <h1>Rapide Meta Ads Dashboard</h1>
+    <p class="login-sub">Enter your access token to load the report.</p>
+
+    <label for="token" class="login-label">Access token</label>
+    <div class="token-wrap">
+      <input id="token" type="password" autocomplete="current-password" spellcheck="false" autofocus>
+      <button type="button" id="toggleToken" class="ghost" aria-pressed="false">Show</button>
+    </div>
+
+    <div id="loginError" class="login-error" role="alert" hidden>
+      <strong id="loginErrorTitle"></strong>
+      <span id="loginErrorBody"></span>
+    </div>
+
+    <button type="submit" id="loginBtn" class="primary">Connect</button>
+  </form>
+</section>
+
+<!-- Dashboard -->
+<div id="app" hidden>
+  <header class="top">
+    <div class="top-row">
+      <h1>Rapide Meta Ads Dashboard</h1>
+      <div class="top-actions">
+        <span id="updated" class="muted"></span>
+        <button type="button" id="refresh" class="ghost">Refresh</button>
+        <button type="button" id="signout" class="ghost">Sign out</button>
+      </div>
+    </div>
+
+    <div class="filters">
+      <label class="f"><span>Campaign</span>
+        <select id="fCampaign"></select>
+      </label>
+      <label class="f"><span>Ad group</span>
+        <select id="fAdGroup"></select>
+      </label>
+
+      <div class="f-group">
+        <label class="f"><span>Date range</span>
+          <select id="fRange">
+            <option value="last7">Last 7 days</option>
+            <option value="last14">Last 14 days</option>
+            <option value="last30" selected>Last 30 days</option>
+            <option value="last90">Last 90 days</option>
+            <option value="thisMonth">This month</option>
+            <option value="lastMonth">Last month</option>
+            <option value="all">All time</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <div id="rangeCustom" class="dates" hidden>
+          <input type="date" id="rStart" aria-label="Range start">
+          <input type="date" id="rEnd" aria-label="Range end">
+        </div>
+      </div>
+
+      <div class="f-group">
+        <label class="f"><span>Compare to</span>
+          <select id="fCompare">
+            <option value="off">No comparison</option>
+            <option value="wow">Week over week</option>
+            <option value="mom">Month over month</option>
+            <option value="custom">Custom period</option>
+          </select>
+        </label>
+        <div id="cmpCustom" class="dates" hidden>
+          <input type="date" id="cStart" aria-label="Comparison start">
+          <input type="date" id="cEnd" aria-label="Comparison end">
+        </div>
+      </div>
+    </div>
+    <p id="rangeNote" class="range-note"></p>
+  </header>
+
+  <main>
+    <div id="banner" class="banner" role="status" hidden></div>
+
+    <section id="cards" class="cards" aria-label="Key metrics"></section>
+
+    <section id="charts" class="charts" aria-label="Trends"></section>
+
+    <section class="panel" aria-labelledby="bdTitle">
+      <div class="panel-head">
+        <h2 id="bdTitle">Compare by campaign and ad group</h2>
+        <div class="panel-controls">
+          <div class="seg" id="bdBy" role="group" aria-label="Group by">
+            <button type="button" data-v="campaign" aria-pressed="true">Campaign</button>
+            <button type="button" data-v="adGroup" aria-pressed="false">Ad group</button>
+            <button type="button" data-v="both" aria-pressed="false">Both</button>
+          </div>
+          <label class="f inline"><span>Chart metric</span>
+            <select id="bdMetric"></select>
+          </label>
+        </div>
+      </div>
+      <div class="bd-chart" id="bdChartWrap"><canvas id="bdChart"></canvas></div>
+      <div class="table-scroll"><table id="bdTable" class="bd-table"></table></div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
