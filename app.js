@@ -6,7 +6,7 @@
      CONFIG: paste your Apps Script Web app URL (ends in /exec)
      ====================================================================== */
   var CONFIG = {
-    WEB_APP_URL: 'PASTE_YOUR_WEB_APP_URL_HERE',
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbwN5YHyiLQe7qsQmE9wLDbkkGQp93hsVvdXKOporM8iua_kHD_-ar3CNy5TlxnjX_2m/exec',
     TIMEOUT_MS: 30000
   };
 
